@@ -173,7 +173,7 @@ const Index = memo(() => {
               <div className="absolute inset-0 bg-gradient-to-r from-primary via-accent to-primary rounded-full blur-xl opacity-60 group-hover:opacity-100 transition-all duration-500 animate-pulse"></div>
               <div className="relative w-16 h-16 rounded-full overflow-hidden ring-4 ring-primary/20 group-hover:ring-primary/40 transition-all duration-300">
                 <img 
-                  src="https://github.com/TarkaYodha.png" 
+                  src="https://github.com/TattvaAI.png" 
                   alt="Shivansh Bansal"
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -200,7 +200,7 @@ const Index = memo(() => {
             {/* Social Links */}
             <div className="flex gap-4">
               <a 
-                href="https://github.com/TarkaYodha" 
+                href="https://github.com/TattvaAI" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="w-11 h-11 rounded-full bg-card/50 backdrop-blur-sm border border-primary/20 flex items-center justify-center hover:bg-primary hover:scale-110 hover:shadow-glow transition-all duration-300 group"
