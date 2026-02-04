@@ -2,13 +2,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Scissors, Zap, Shield, Brain, Sparkles } from 'lucide-react';
 import { memo, lazy, Suspense } from 'react';
 
-// Lazy load the PDF processor for better performance
 const PDFProcessor = lazy(() => import('@/components/PDFProcessor'));
 
-/**
- * Main landing page component
- * Features: Hero section, feature showcase, PDF processor
- */
 const Index = memo(() => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 relative overflow-hidden">

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { FileUp, X } from "lucide-react";
 import { formatFileSize, MAX_FILE_SIZE_BYTES } from "@/lib/pdf-utils";
-import { validatePDFFile } from "@/services/pdfService";
 
 interface FileUploadProps {
   file: File | null;
@@ -21,13 +20,19 @@ export const FileUpload = React.memo<FileUploadProps>(({ file, onFileChange, onC
     
     if (!pdfFile) return;
     
-    // Validate file
-    const validation = validatePDFFile(pdfFile, MAX_FILE_SIZE_BYTES);
-    
-    if (!validation.valid) {
+    if (pdfFile.type !== 'application/pdf') {
       toast({
-        title: "Invalid file",
-        description: validation.error,
+        title: "Invalid file type",
+        description: "Please upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (pdfFile.size > MAX_FILE_SIZE_BYTES) {
+      toast({
+        title: "File too large",
+        description: `Your file is ${formatFileSize(pdfFile.size)}. Maximum allowed size is ${formatFileSize(MAX_FILE_SIZE_BYTES)}.`,
         variant: "destructive",
       });
       return;

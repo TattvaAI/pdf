@@ -1,5 +1,4 @@
 import { useReducer, useCallback } from 'react';
-import { config } from '@/lib/config';
 
 export interface ProcessingResult {
   fileName: string;
@@ -36,9 +35,9 @@ type PDFProcessorAction =
 
 const initialState: PDFProcessorState = {
   file: null,
-  prefix: config.processing.defaultPrefix,
-  suffix: config.processing.defaultSuffix,
-  zipName: config.processing.defaultZipName,
+  prefix: '',
+  suffix: '',
+  zipName: 'split_files',
   ranges: '',
   exclusions: '',
   isProcessing: false,

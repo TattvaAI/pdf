@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef } from "react";
+import { PDFDocument } from "pdf-lib";
+import JSZip from "jszip";
 import { useToast } from "@/hooks/use-toast";
-import { usePDFProcessor } from "@/hooks/usePDFProcessor";
-import { validateConfiguration } from "@/lib/pdf-utils";
-import { processPDF } from "@/services/pdfService";
+import { usePDFProcessor, ProcessingResult } from "@/hooks/usePDFProcessor";
+import {
+  buildFileName,
+  buildPageSequenceFromState,
+  buildFilenameSequence,
+  parseExclusions,
+  determinePaddingLength,
+  validateConfiguration,
+} from "@/lib/pdf-utils";
 import { FileUpload } from "./FileUpload";
 import { ConfigurationForm } from "./ConfigurationForm";
 import { ProgressDisplay } from "./ProgressDisplay";
@@ -31,7 +39,7 @@ export default function PDFProcessor() {
     };
   }, [state.downloadUrl]);
 
-  const processPDFHandler = useCallback(async () => {
+  const processPDF = useCallback(async () => {
     const validationError = validateConfiguration(state);
     if (validationError) {
       toast({
@@ -48,29 +56,104 @@ export default function PDFProcessor() {
     actions.setDownloadUrl(null);
 
     try {
-      const result = await processPDF({
-        state,
-        onProgress: (progress) => actions.setProgress(progress),
+      const arrayBuffer = await state.file!.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const totalPages = pdfDoc.getPageCount();
+
+      actions.setProgress(10);
+
+      let pageSequence: number[] = [];
+
+      try {
+        pageSequence = buildPageSequenceFromState(state);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Invalid range configuration";
+        throw new Error(message);
+      }
+
+      if (pageSequence.length === 0) {
+        throw new Error("No valid pages to process");
+      }
+
+      const exclusions = parseExclusions(state.exclusions);
+      const pagesToProcess = Math.min(pageSequence.length, totalPages);
+
+      if (pagesToProcess === 0) {
+        throw new Error("No pages to process");
+      }
+
+      const startNumber = pageSequence.length > 0 ? pageSequence[0] : 1;
+      const filenameSequence = buildFilenameSequence(
+        pagesToProcess,
+        exclusions,
+        startNumber
+      );
+
+      actions.setProgress(20);
+
+      const zip = new JSZip();
+      const processedResults: ProcessingResult[] = [];
+      const paddingLength = determinePaddingLength(filenameSequence, state.ranges);
+
+      for (let i = 0; i < pagesToProcess; i += 1) {
+        try {
+          const pdfPageIndex = i;
+          const filenameNumber = filenameSequence[i];
+          const fileName = buildFileName({
+            prefix: state.prefix,
+            suffix: state.suffix,
+            sequenceNumber: filenameNumber,
+            paddingLength,
+          });
+
+          const newPdf = await PDFDocument.create();
+          const [copiedPage] = await newPdf.copyPages(pdfDoc, [pdfPageIndex]);
+          newPdf.addPage(copiedPage);
+
+          const pdfBytes = await newPdf.save();
+          zip.file(fileName, pdfBytes);
+
+          processedResults.push({
+            fileName,
+            success: true
+          });
+
+          actions.setProgress(20 + ((i + 1) / pagesToProcess) * 70);
+        } catch (error) {
+          const filenameNumber = filenameSequence[i];
+          const fileName = buildFileName({
+            prefix: state.prefix,
+            suffix: state.suffix,
+            sequenceNumber: filenameNumber,
+            paddingLength,
+          });
+
+          processedResults.push({
+            fileName,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      actions.setResults(processedResults);
+      actions.setProgress(90);
+
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const url = URL.createObjectURL(zipBlob);
+      actions.setDownloadUrl(url);
+
+      actions.setProgress(100);
+
+      toast({
+        title: "✨ Processing complete!",
+        description: `Successfully processed ${processedResults.filter(r => r.success).length} pages.`,
       });
 
-      if (result.success && result.zipBlob) {
-        actions.setResults(result.results);
-        
-        const url = URL.createObjectURL(result.zipBlob);
-        actions.setDownloadUrl(url);
-
-        const successCount = result.results.filter((r) => r.success).length;
-        toast({
-          title: "✨ Processing complete!",
-          description: `Successfully processed ${successCount} pages.`,
-        });
-      } else {
-        throw new Error(result.error || "Processing failed");
-      }
     } catch (error) {
       toast({
         title: "Processing failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: "destructive",
       });
     } finally {
