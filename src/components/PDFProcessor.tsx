@@ -40,11 +40,11 @@ export default function PDFProcessor() {
   }, [state.downloadUrl]);
 
   const processPDF = useCallback(async () => {
-    const validationError = validateConfiguration(state);
-    if (validationError) {
+    const validation = validateConfiguration(state);
+    if (!validation.isValid) {
       toast({
         title: "Validation Error",
-        description: validationError,
+        description: validation.error,
         variant: "destructive",
       });
       return;

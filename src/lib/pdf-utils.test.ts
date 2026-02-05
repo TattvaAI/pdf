@@ -139,9 +139,9 @@ describe('parsePageSegments', () => {
     });
 
     it('should throw error for invalid format', () => {
-        expect(() => parsePageSegments('abc')).toThrow('Invalid range segment');
-        expect(() => parsePageSegments('1-')).toThrow('Invalid range segment');
-        expect(() => parsePageSegments('-5')).toThrow('Invalid range segment');
+        expect(() => parsePageSegments('abc')).toThrow('Invalid page number');
+        expect(() => parsePageSegments('1-')).toThrow('Invalid range format');
+        expect(() => parsePageSegments('-5')).toThrow('Invalid range format');
     });
 
     it('should throw error for invalid range', () => {
@@ -329,30 +329,40 @@ describe('validateConfiguration', () => {
 
     it('should return error if no file', () => {
         const state = createMockState(null, '1-5');
-        expect(validateConfiguration(state)).toBe('Please upload a PDF file');
+        const result = validateConfiguration(state);
+        expect(result.isValid).toBe(false);
+        expect(result.error).toBe('Please select a PDF file');
     });
 
     it('should return error if no ranges', () => {
         const mockFile = new File([''], 'test.pdf', { type: 'application/pdf' });
         const state = createMockState(mockFile, '');
-        expect(validateConfiguration(state)).toBe('Please enter page ranges');
+        const result = validateConfiguration(state);
+        expect(result.isValid).toBe(false);
+        expect(result.error).toBe('Please specify page ranges');
     });
 
     it('should return error for invalid range format', () => {
         const mockFile = new File([''], 'test.pdf', { type: 'application/pdf' });
         const state = createMockState(mockFile, 'abc');
-        expect(validateConfiguration(state)).toContain('Invalid range format');
+        const result = validateConfiguration(state);
+        expect(result.isValid).toBe(false);
+        expect(result.error).toContain('Invalid page number');
     });
 
-    it('should return null for valid configuration', () => {
+    it('should return valid for valid configuration', () => {
         const mockFile = new File([''], 'test.pdf', { type: 'application/pdf' });
         const state = createMockState(mockFile, '1-5');
-        expect(validateConfiguration(state)).toBeNull();
+        const result = validateConfiguration(state);
+        expect(result.isValid).toBe(true);
+        expect(result.error).toBeUndefined();
     });
 
     it('should accept complex valid ranges', () => {
         const mockFile = new File([''], 'test.pdf', { type: 'application/pdf' });
         const state = createMockState(mockFile, '1-5,8,10-12');
-        expect(validateConfiguration(state)).toBeNull();
+        const result = validateConfiguration(state);
+        expect(result.isValid).toBe(true);
+        expect(result.error).toBeUndefined();
     });
 });

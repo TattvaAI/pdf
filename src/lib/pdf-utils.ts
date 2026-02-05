@@ -1,131 +1,129 @@
 import type { PDFProcessorState } from "@/hooks/usePDFProcessor";
 import {
-  RANGE_TOKEN_REGEX,
-  RANGE_LIST_REGEX,
-  MAX_FILE_SIZE_BYTES,
-  SIZE_UNITS,
-  DEFAULT_SIZE_FRACTION_DIGITS,
-  BYTES_PER_KB,
-  MIN_PADDING_LENGTH,
   INVALID_FILENAME_CHARS,
   MAX_FILENAME_COMPONENT_LENGTH,
+  MIN_PADDING_LENGTH,
 } from "./constants";
 
-export { MAX_FILE_SIZE_BYTES };
+// ==================== File Size Utilities ====================
 
 /**
- * Formats a byte count into a human-readable file size string
- * @param bytes - The number of bytes to format
- * @param fractionDigits - Number of decimal places to show (default: 2)
- * @returns Formatted string like "1.5 MB"
+ * Formats a file size in bytes to a human-readable string
+ * @param bytes - File size in bytes
+ * @param fractionDigits - Number of decimal places (default: 2)
+ * @returns Formatted string with appropriate unit (B, KB, MB, GB)
  * @example
- * formatFileSize(1536) // "1.50 KB"
- * formatFileSize(1048576) // "1.00 MB"
+ * formatFileSize(1024) // "1.00 KB"
+ * formatFileSize(1536, 1) // "1.5 KB"
  */
-export const formatFileSize = (bytes: number, fractionDigits = DEFAULT_SIZE_FRACTION_DIGITS): string => {
+export const formatFileSize = (
+  bytes: number,
+  fractionDigits: number = 2
+): string => {
   if (!Number.isFinite(bytes) || bytes < 0) {
     return "0 B";
   }
 
-  let value = bytes;
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
   let unitIndex = 0;
 
-  while (value >= BYTES_PER_KB && unitIndex < SIZE_UNITS.length - 1) {
-    value /= BYTES_PER_KB;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
     unitIndex += 1;
   }
 
-  const decimals = unitIndex === 0 ? 0 : fractionDigits;
-  return `${value.toFixed(decimals)} ${SIZE_UNITS[unitIndex]}`;
+  const formattedSize =
+    unitIndex === 0 ? size.toString() : size.toFixed(fractionDigits);
+
+  return `${formattedSize} ${units[unitIndex]}`;
 };
 
 // ==================== Filename Utilities ====================
 
-/* @param input - The filename component to sanitize
+/**
+ * Sanitizes a filename component by removing invalid characters
+ * @param input - The filename component to sanitize
  * @returns Sanitized string safe for use in filenames across all operating systems
- */
-export const sanitizeFilenameComponent = (input: string): string => {
-  if (!input) return "";
-  
  */
 export const sanitizeFilenameComponent = (input: string): string => {
   return input
     .replace(INVALID_FILENAME_CHARS, "")
     .trim()
     .slice(0, MAX_FILENAME_COMPONENT_LENGTH);
-}; "1,3,5")
+};
+
+/**
+ * Parses a comma-separated string of page numbers into a sorted array
+ * @param exclusionsString - Comma-separated page numbers (e.g., "1,3,5")
  * @returns Array of unique page numbers sorted in ascending order
  * @example
  * parseExclusions("1,3,5,3") // [1, 3, 5]
  * parseExclusions("5,1,3") // [1, 3, 5]
  */
-export const parseExclusions = (exclusionString: string): number[] => {
-  if (!exclusionString?.trim()) {
- * @example
- * parseExclusions("1,3,5,3") // [1, 3, 5]
- */
-export const parseExclusions = (exclusionString: string): number[] => {
-  if (!exclusionString.trim()) {
+export const parseExclusions = (exclusionsString: string): number[] => {
+  if (!exclusionsString.trim()) {
     return [];
   }
 
-  const unique = new Set<number>();
-  exclusionString.split(",").forEach((token) => {
-    const value = Number.parseInt(token.trim(), 10);
-    if (Number.isFinite(value)) {
-      unique.add(value);
-    }
-  });
+  const numbers = exclusionsString
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => parseInt(token, 10))
+    .filter((num) => Number.isFinite(num) && num > 0);
 
-  return Array.from(unique
+  return Array.from(new Set(numbers)).sort((a, b) => a - b);
+};
+
+// ==================== Range Parsing Utilities ====================
+
+/**
+ * Expands a single range token into an array of page numbers
+ * @param token - A single page or range (e.g., "5" or "1-3")
+ * @returns Array of page numbers
  * @throws Error if the token format is invalid
- * @example
- * expandRangeToken("5") // [5]
- * expandRangeToken("1-3") // [1, 2, 3]
  */
 const expandRangeToken = (token: string): number[] => {
-  if (!token) {
-    return [];
+  if (token.includes("-")) {
+    const parts = token.split("-");
+    if (parts.length !== 2) {
+      throw new Error(`Invalid range format: "${token}"`);
+    }
+
+    const start = parseInt(parts[0].trim(), 10);
+    const end = parseInt(parts[1].trim(), 10);
+
+    if (!Number.isFinite(start) || !Number.isFinite(end)) {
+      throw new Error(`Invalid range format: "${token}"`);
+    }
+
+    return generateInclusiveRange(start, end);
   }
 
-  if (!RANGE_TOKEN_REGEX.test(token)) {
-    throw new Error(`Invalid range segment: ${token}`);
+  const pageNumber = parseInt(token, 10);
+  if (!Number.isFinite(pageNumber) || pageNumber <= 0) {
+    throw new Error(`Invalid page number: "${token}"`);
   }
 
-  if (!token.includes("-")) {
-    return [Number.parseInt(token, 10)];
-  }
-
-  const [startToken, endToken] = token.split("-");
-  const start = Number.parseInt(startToken, 10);
-  const end = Number.parseInt(endToken, 10);
-
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
-    throw new Error(`Invalid range: ${token}`);
-  }
-
-  const values: number[] = [];
-  for (let value = start; value <= end; value += 1) {
-    values.push(value);
-  }
-  return values;
+  return [pageNumber];
 };
 
 /**
- * Removes duplicate values from an array while preserving order
- * @param values - Array of numbers
- * @returns Array with duplicates removed
+ * Deduplicates an array while preserving the original order
+ * @param arr - Array to deduplicate
+ * @returns Array with duplicates removed, preserving first occurrence order
  */
-const dedupePreserveOrder = (values: number[]): number[] => {
+const dedupePreserveOrder = (arr: number[]): number[] => {
   const seen = new Set<number>();
   const result: number[] = [];
 
-  values.forEach((value) => {
+  for (const value of arr) {
     if (!seen.has(value)) {
       seen.add(value);
       result.push(value);
     }
-  });
+  }
 
   return result;
 };
@@ -228,15 +226,19 @@ export const determinePaddingLength = (sequence: number[], rangesString: string)
     // Check if first token has a range like "01-05"
     if (firstToken.includes('-')) {
       const [startStr] = firstToken.split('-');
-      requestedLength = startStr.trim().length;
-    } else {
-      // Single number like "01"
+      if (startStr && /^0+\d+$/.test(startStr)) {
+        requestedLength = startStr.length;
+      }
+    } else if (/^0+\d+$/.test(firstToken)) {
+      // Single page with leading zeros like "001"
       requestedLength = firstToken.length;
     }
   }
 
-  const maxSequenceDigits = sequence.reduce((max, value) => {
-    return Math.max(max, value.toString().length);
+  // Also consider the maximum number in the sequence
+  const maxSequenceDigits = sequence.reduce((max, num) => {
+    const digits = num.toString().length;
+    return Math.max(max, digits);
   }, 0);
 
   return Math.max(requestedLength, maxSequenceDigits, MIN_PADDING_LENGTH);
@@ -249,55 +251,58 @@ export const determinePaddingLength = (sequence: number[], rangesString: string)
  * @returns Zero-padded string
  * @example
  * padNumber(5, 3) // "005"
+ * padNumber(123, 2) // "123" (doesn't truncate)
  */
 export const padNumber = (value: number, length: number): string => {
   return value.toString().padStart(length, "0");
 };
 
 /**
- * Builds a filename for a split PDF page
+ * Builds a complete filename from components
  * @param options - Filename components
  * @returns Complete filename with .pdf extension
  * @example
- * buildFileName({ prefix: "DMC", suffix: "", sequenceNumber: 5, paddingLength: 3 })
- * // "DMC005.pdf"
+ * buildFileName({ prefix: "DMC", suffix: "_final", sequenceNumber: 5, paddingLength: 3 })
+ * // "DMC005_final.pdf"
  */
-export const buildFileName = (options: FileNameOptions): string => {
-  const { prefix, suffix, sequenceNumber, paddingLength } = options;
-  const sanitizedPrefix = sanitizeFilenameComponent(prefix);
-  const sanitizedSuffix = sanitizeFilenameComponent(suffix);
-  const paddedValue = padNumber(sequenceNumber, paddingLength);
-
-  return `${sanitizedPrefix}${paddedValue}${sanitizedSuffix}.pdf`;
-};{
-  prefix,
-  suffix,
-  sequenceNumber,
-  paddingLength,
-}: {
+export const buildFileName = (options: {
   prefix: string;
   suffix: string;
   sequenceNumber: number;
   paddingLength: number;
 }): string => {
+  const { prefix, suffix, sequenceNumber, paddingLength } = options;
+
+  const sanitizedPrefix = sanitizeFilenameComponent(prefix);
+  const sanitizedSuffix = sanitizeFilenameComponent(suffix);
+  const paddedNumber = padNumber(sequenceNumber, paddingLength);
+
+  return `${sanitizedPrefix}${paddedNumber}${sanitizedSuffix}.pdf`;
+};
+
 /**
- * Validates the PDF processor configuration
+ * Validates the PDF processing configuration
  * @param state - Current PDF processor state
- * @returns"Please upload a PDF file";
+ * @returns Validation result with success flag and optional error message
+ */
+export const validateConfiguration = (state: PDFProcessorState): {
+  isValid: boolean;
+  error?: string;
+} => {
+  if (!state.file) {
+    return { isValid: false, error: "Please select a PDF file" };
   }
 
   if (!state.ranges.trim()) {
-    return "Please enter page ranges";
+    return { isValid: false, error: "Please specify page ranges" };
   }
 
-  if (!RANGE_LIST_REGEX.test(state.ranges.replace(/\s/g, ""))) {
-    return "Invalid range format. Use values like '1-5,8,10-12'"
+  try {
+    parsePageSegments(state.ranges);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid range format";
+    return { isValid: false, error: message };
   }
 
-  if (!RANGE_LIST_REGEX.test(state.ranges.replace(/\s/g, ""))) {
-    return ERROR_MESSAGES.INVALID_RANGE_FORMAT;
-  }
-
-  return null;
+  return { isValid: true };
 };
-

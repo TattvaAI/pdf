@@ -4,7 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { FileUp, X } from "lucide-react";
-import { formatFileSize, MAX_FILE_SIZE_BYTES } from "@/lib/pdf-utils";
+import { formatFileSize } from "@/lib/pdf-utils";
+import { MAX_FILE_SIZE_BYTES } from "@/lib/constants";
 
 interface FileUploadProps {
   file: File | null;
@@ -17,9 +18,9 @@ export const FileUpload = React.memo<FileUploadProps>(({ file, onFileChange, onC
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const pdfFile = acceptedFiles[0];
-    
+
     if (!pdfFile) return;
-    
+
     if (pdfFile.type !== 'application/pdf') {
       toast({
         title: "Invalid file type",
@@ -62,15 +63,14 @@ export const FileUpload = React.memo<FileUploadProps>(({ file, onFileChange, onC
 
   return (
     <Card className="p-8 shadow-large border-primary/20 bg-card/80 backdrop-blur-sm">
-      <div {...getRootProps()} className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-smooth ${
-        isDragActive
+      <div {...getRootProps()} className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-smooth ${isDragActive
           ? 'border-primary bg-gradient-primary/10 scale-[1.02] shadow-glow'
           : 'border-muted hover:border-primary hover:bg-gradient-primary/5 hover:shadow-medium'
-      }`}
-      role="button"
-      tabIndex={0}
-      aria-label={file ? `File uploaded: ${file.name}` : "Upload PDF file - drag and drop or click to browse"}
-      aria-describedby="file-upload-description"
+        }`}
+        role="button"
+        tabIndex={0}
+        aria-label={file ? `File uploaded: ${file.name}` : "Upload PDF file - drag and drop or click to browse"}
+        aria-describedby="file-upload-description"
       >
         <input {...getInputProps()} aria-label="PDF file input" />
         <div className={`transition-smooth ${isDragActive ? 'scale-110' : ''}`}>
